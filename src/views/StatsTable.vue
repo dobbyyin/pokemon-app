@@ -1,8 +1,8 @@
 <template>
   <div class="page">
-    <div class="page-header">📊 野生最高 CP 表</div>
+    <div class="page-header">📊 野生 CP 表</div>
     <div style="font-size:12px;color:var(--sub);margin-bottom:12px">
-      完美個體（紅三星）野生抓取最高 CP（Lv.20・15/15/15 IV）
+      Lv.20 野生抓取 CP（100% 紅三星 ＋ 三種 98%）
     </div>
 
     <div class="search-wrap">
@@ -36,27 +36,47 @@
       </div>
 
       <div v-for="p in paginated" :key="p.id" class="cp-card">
-        <img
-          :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`"
-          width="52" height="52" style="image-rendering:pixelated"
-          @error="e => e.target.style.display='none'"
-        />
-        <div class="cp-card-info">
-          <div class="cp-card-name">{{ p.zhName }}</div>
-          <div style="font-size:10px;color:var(--sub);margin:1px 0">#{{ String(p.id).padStart(4,'0') }}</div>
-          <div style="display:flex;gap:4px;flex-wrap:wrap">
-            <span
-              v-for="t in p.types" :key="t"
-              class="type-badge"
-              :style="{ background: typeColors[t], fontSize:'10px', padding:'2px 6px' }"
-            >{{ typeNameZh[t] }}</span>
+        <!-- 左：圖 + 名稱 + 屬性 -->
+        <div class="cp-card-left">
+          <img
+            :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`"
+            width="52" height="52" style="image-rendering:pixelated"
+            @error="e => e.target.style.display='none'"
+          />
+          <div class="cp-card-info">
+            <div class="cp-card-name">{{ p.zhName }}</div>
+            <div style="font-size:10px;color:var(--sub);margin:1px 0">#{{ String(p.id).padStart(4,'0') }}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <span
+                v-for="t in p.types" :key="t"
+                class="type-badge"
+                :style="{ background: typeColors[t], fontSize:'10px', padding:'2px 6px' }"
+              >{{ typeNameZh[t] }}</span>
+            </div>
           </div>
         </div>
-        <div class="cp-card-val">
-          <div class="cp-label">紅三星 CP</div>
-          <div class="cp-num" v-if="p.wildCP">{{ p.wildCP }}</div>
-          <div class="cp-num" style="color:var(--sub);font-size:14px" v-else>無資料</div>
+
+        <!-- 右：四行 CP -->
+        <div class="cp-grid" v-if="p.wildCP">
+          <div class="cp-row top">
+            <span class="cp-iv-label">🔴 100%</span>
+            <span class="cp-val-big">{{ p.wildCP }}</span>
+          </div>
+          <div class="cp-divider"></div>
+          <div class="cp-row">
+            <span class="cp-iv-label">攻 14</span>
+            <span class="cp-val">{{ p.cp98atk }}</span>
+          </div>
+          <div class="cp-row">
+            <span class="cp-iv-label">防 14</span>
+            <span class="cp-val">{{ p.cp98def }}</span>
+          </div>
+          <div class="cp-row">
+            <span class="cp-iv-label">耐 14</span>
+            <span class="cp-val">{{ p.cp98sta }}</span>
+          </div>
         </div>
+        <div v-else style="font-size:13px;color:var(--sub);padding:8px">無資料</div>
       </div>
 
       <div v-if="filtered.length > pageSize * page" style="text-align:center;margin:16px 0">
@@ -88,14 +108,13 @@ const allTypes = [
   'ground','flying','psychic','bug','rock','ghost','dragon','dark','steel','fairy'
 ]
 
-// Lv.20 CPM = 野生遇到時的最高 CP（完美個體）
 const CPM_LV20 = 0.5974
 
-function calcWildCP(id) {
+function cp(id, ivAtk, ivDef, ivSta) {
   const s = goStats.value?.[id]
   if (!s) return null
   return Math.max(10, Math.floor(
-    (s.atk + 15) * Math.sqrt(s.def + 15) * Math.sqrt(s.sta + 15) * CPM_LV20 * CPM_LV20 / 10
+    (s.atk + ivAtk) * Math.sqrt(s.def + ivDef) * Math.sqrt(s.sta + ivSta) * CPM_LV20 * CPM_LV20 / 10
   ))
 }
 
@@ -152,7 +171,10 @@ async function loadPokemon() {
 const filtered = computed(() => {
   let list = allPokemon.value.map(p => ({
     ...p,
-    wildCP: calcWildCP(p.id)
+    wildCP:  cp(p.id, 15, 15, 15),
+    cp98atk: cp(p.id, 14, 15, 15),
+    cp98def: cp(p.id, 15, 14, 15),
+    cp98sta: cp(p.id, 15, 15, 14),
   }))
   if (query.value.trim()) {
     const q = query.value.trim().toLowerCase()
@@ -181,10 +203,15 @@ loadPokemon()
   margin-bottom: 10px;
 }
 
-.cp-card-info {
+.cp-card-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex: 1;
   min-width: 0;
 }
+
+.cp-card-info { min-width: 0; }
 
 .cp-card-name {
   font-weight: 700;
@@ -192,20 +219,46 @@ loadPokemon()
   margin-bottom: 2px;
 }
 
-.cp-card-val {
-  text-align: right;
+/* ── CP 右欄 ── */
+.cp-grid {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: right;
+  min-width: 90px;
 }
 
-.cp-label {
+.cp-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.cp-row.top { margin-bottom: 2px; }
+
+.cp-iv-label {
   font-size: 10px;
   color: var(--sub);
-  margin-bottom: 2px;
+  white-space: nowrap;
 }
 
-.cp-num {
+.cp-val-big {
   font-size: 22px;
   font-weight: 800;
   color: var(--accent);
+}
+
+.cp-val {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.cp-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 2px 0;
 }
 </style>
