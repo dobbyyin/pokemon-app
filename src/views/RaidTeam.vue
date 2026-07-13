@@ -296,13 +296,18 @@ function getBestPveMoves(pokemonId, types) {
 }
 
 // ── 計算推薦隊伍 ──
+const allGmaxIds = GMAX_GROUPS.flatMap(g => g.ids)
+
 const counters = computed(() => {
   if (!boss.value || !goDataReady.value || !allPokemonList.value.length) return []
   const wt = weakTypes.value
   const doubleWeak = doubleWeakTypes.value
 
+  // 極巨化模式：只從有極巨化的寶可夢中挑（才有 G-Max 招式可用）
   return allPokemonList.value
-    .filter(p => p.id !== boss.value.id && goStats.value[p.id])
+    .filter(p => p.id !== boss.value.id && goStats.value[p.id] &&
+      (raidMode.value === 'normal' || allGmaxIds.includes(p.id))
+    )
     .map(p => {
       const stat = goStats.value[p.id]
       const doubleCount = p.types.filter(t => doubleWeak.includes(t)).length
