@@ -1,7 +1,6 @@
 <template>
   <div id="app">
     <component :is="views[activeTab]" />
-
     <nav class="bottom-nav">
       <button
         v-for="(tab, i) in tabs" :key="i"
@@ -27,70 +26,70 @@ const tabs = [
 ]
 const views = [PokemonInfo, StatsTable]
 
-// Global Pokemon name cache: { zhName -> apiName, apiName -> zhName }
+// ── 主系列快取 ──
 const pokemonNameMap = ref({})
-const allPokemonList = ref([]) // [{id, apiName, zhName, types:[]}]
+const allPokemonList = ref([])
 const pokemonCacheReady = ref(false)
+
+// ── GO 資料 ──
+const goStats = ref({})        // id → {atk, def, sta}
+const goFastMoves = ref({})    // name → {power, energyDelta, duration}
+const goChargedMoves = ref({}) // name → {power, energyDelta}
+const goPokemonMoves = ref({}) // id → {fast:[], charged:[], eliteFast:[], eliteCharged:[]}
+const goDataReady = ref(false)
 
 provide('pokemonNameMap', pokemonNameMap)
 provide('allPokemonList', allPokemonList)
 provide('pokemonCacheReady', pokemonCacheReady)
+provide('goStats', goStats)
+provide('goFastMoves', goFastMoves)
+provide('goChargedMoves', goChargedMoves)
+provide('goPokemonMoves', goPokemonMoves)
+provide('goDataReady', goDataReady)
 
 const GQL = 'https://beta.pokeapi.co/graphql/v1beta'
+const POGO = 'https://pogoapi.net/api/v1'
 
-async function gql(query, variables) {
-  const res = await fetch(GQL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query, variables }),
-  })
-  const json = await res.json()
-  return json.data
-}
-
+// ── 主系列快取 ──
 async function loadPokemonCache() {
-  const CACHE_KEY = 'poke_names_v2'
-  const CACHE_TTL = 86400000 // 24h
-  const cached = localStorage.getItem(CACHE_KEY)
+  const KEY = 'poke_names_v2', TTL = 86400000
+  const cached = localStorage.getItem(KEY)
   if (cached) {
-    const { ts, data } = JSON.parse(cached)
-    if (Date.now() - ts < CACHE_TTL) {
-      allPokemonList.value = data
-      buildNameMap()
-      pokemonCacheReady.value = true
-      return
-    }
+    try {
+      const { ts, data } = JSON.parse(cached)
+      if (Date.now() - ts < TTL) {
+        allPokemonList.value = data
+        buildNameMap()
+        pokemonCacheReady.value = true
+        return
+      }
+    } catch {}
   }
-
   try {
-    const data = await gql(`{
-      pokemon_v2_pokemon(where: {is_default: {_eq: true}}, order_by: {id: asc}) {
-        id
-        name
-        pokemon_v2_pokemontypes(order_by: {slot: asc}) {
-          pokemon_v2_type { name }
-        }
-        pokemon_v2_pokemonspecy {
-          pokemon_v2_pokemonspeciesnames(where: {pokemon_v2_language: {name: {_eq: "zh-Hant"}}}) {
-            name
+    const res = await fetch(GQL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: `{
+        pokemon_v2_pokemon(where: {is_default: {_eq: true}}, order_by: {id: asc}) {
+          id name
+          pokemon_v2_pokemontypes(order_by: {slot: asc}) { pokemon_v2_type { name } }
+          pokemon_v2_pokemonspecy {
+            pokemon_v2_pokemonspeciesnames(where: {pokemon_v2_language: {name: {_eq: "zh-Hant"}}}) { name }
           }
         }
-      }
-    }`)
-
-    allPokemonList.value = data.pokemon_v2_pokemon.map(p => ({
+      }` })
+    })
+    const json = await res.json()
+    allPokemonList.value = json.data.pokemon_v2_pokemon.map(p => ({
       id: p.id,
       apiName: p.name,
       zhName: p.pokemon_v2_pokemonspecy?.pokemon_v2_pokemonspeciesnames?.[0]?.name || p.name,
       types: p.pokemon_v2_pokemontypes.map(t => t.pokemon_v2_type.name),
     }))
-
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), data: allPokemonList.value }))
+    localStorage.setItem(KEY, JSON.stringify({ ts: Date.now(), data: allPokemonList.value }))
     buildNameMap()
     pokemonCacheReady.value = true
-  } catch (e) {
-    console.error('Failed to load pokemon cache', e)
-  }
+  } catch (e) { console.error(e) }
 }
 
 function buildNameMap() {
@@ -102,5 +101,66 @@ function buildNameMap() {
   pokemonNameMap.value = map
 }
 
+// ── GO 資料 ──
+async function loadGOData() {
+  const KEY = 'poke_go_data_v1', TTL = 86400000
+  const cached = localStorage.getItem(KEY)
+  if (cached) {
+    try {
+      const { ts, data } = JSON.parse(cached)
+      if (Date.now() - ts < TTL) {
+        goStats.value = data.stats
+        goFastMoves.value = data.fast
+        goChargedMoves.value = data.charged
+        goPokemonMoves.value = data.moves
+        goDataReady.value = true
+        return
+      }
+    } catch {}
+  }
+  try {
+    const [statsRaw, fastRaw, chargedRaw, movesRaw] = await Promise.all([
+      fetch(`${POGO}/pokemon_stats.json`).then(r => r.json()),
+      fetch(`${POGO}/fast_moves.json`).then(r => r.json()),
+      fetch(`${POGO}/charged_moves.json`).then(r => r.json()),
+      fetch(`${POGO}/current_pokemon_moves.json`).then(r => r.json()),
+    ])
+
+    const stats = {}
+    for (const s of statsRaw) {
+      if (!stats[s.pokemon_id] || s.form === 'Normal') {
+        stats[s.pokemon_id] = { atk: s.base_attack, def: s.base_defense, sta: s.base_stamina }
+      }
+    }
+
+    const fast = {}
+    for (const m of fastRaw) fast[m.name] = m
+
+    const charged = {}
+    for (const m of chargedRaw) charged[m.name] = m
+
+    const moves = {}
+    for (const p of movesRaw) {
+      if (!moves[p.pokemon_id] || p.form === 'Normal') {
+        moves[p.pokemon_id] = {
+          fast: p.fast_moves || [],
+          charged: p.charged_moves || [],
+          eliteFast: p.elite_fast_moves || [],
+          eliteCharged: p.elite_charged_moves || [],
+        }
+      }
+    }
+
+    goStats.value = stats
+    goFastMoves.value = fast
+    goChargedMoves.value = charged
+    goPokemonMoves.value = moves
+    goDataReady.value = true
+
+    localStorage.setItem(KEY, JSON.stringify({ ts: Date.now(), data: { stats, fast, charged, moves } }))
+  } catch (e) { console.error('GO data load failed', e) }
+}
+
 loadPokemonCache()
+loadGOData()
 </script>

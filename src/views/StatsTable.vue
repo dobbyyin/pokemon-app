@@ -55,6 +55,12 @@
 
         <!-- 右側：六項數值 -->
         <div class="poke-stat-bars">
+          <!-- GO CP -->
+          <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border-radius:8px;padding:5px 10px;margin-bottom:8px">
+            <span style="font-size:11px;color:var(--sub)">GO Lv.40 CP</span>
+            <span style="font-size:17px;font-weight:800;color:var(--accent)">{{ calcCP(p.id) ?? '—' }}</span>
+          </div>
+
           <div v-for="s in statOrder" :key="s.key" class="stat-row">
             <span class="stat-label">{{ s.label }}</span>
             <span class="stat-val" :style="{ color: statColor(p.lv100[s.key]) }">{{ p.lv100[s.key] }}</span>
@@ -96,6 +102,15 @@ const pageSize = 30
 
 const loading = ref(true)
 const allPokemon = ref([])
+
+const goStats = inject('goStats')
+
+function calcCP(id) {
+  const s = goStats.value[id]
+  if (!s) return null
+  const cpm = 0.7903
+  return Math.max(10, Math.floor((s.atk + 15) * Math.sqrt(s.def + 15) * Math.sqrt(s.sta + 15) * cpm * cpm / 10))
+}
 
 const allTypes = [
   'normal','fire','water','electric','grass','ice','fighting','poison',
