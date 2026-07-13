@@ -77,17 +77,17 @@
           </div>
         </div>
         <div v-else style="font-size:13px;color:var(--sub);padding:8px">無資料</div>
-      </div>
 
-      <!-- 進化時序 -->
-      <div v-if="getEvoChain(p.id)" class="cp-evo">
-        <template v-for="(stage, si) in getEvoChain(p.id)" :key="si">
-          <span v-if="si > 0" class="cp-evo-arrow">→</span>
-          <span v-for="ep in stage" :key="ep.id"
-            class="cp-evo-name" :class="{ active: ep.id === p.id }">
-            {{ ep.zhName }}
-          </span>
-        </template>
+        <!-- 進化時序 -->
+        <div v-if="getEvoChain(p.id)" class="cp-evo">
+          <template v-for="(stage, si) in getEvoChain(p.id)" :key="si">
+            <span v-if="si > 0" class="cp-evo-arrow">→</span>
+            <span v-for="ep in stage" :key="ep.id"
+              class="cp-evo-name" :class="{ active: ep.id === p.id }">
+              {{ ep.zhName }}
+            </span>
+          </template>
+        </div>
       </div>
 
       <div v-if="filtered.length > pageSize * page" style="text-align:center;margin:16px 0">
