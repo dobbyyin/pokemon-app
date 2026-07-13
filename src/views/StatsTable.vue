@@ -79,6 +79,17 @@
         <div v-else style="font-size:13px;color:var(--sub);padding:8px">無資料</div>
       </div>
 
+      <!-- 進化時序 -->
+      <div v-if="getEvoChain(p.id)" class="cp-evo">
+        <template v-for="(stage, si) in getEvoChain(p.id)" :key="si">
+          <span v-if="si > 0" class="cp-evo-arrow">→</span>
+          <span v-for="ep in stage" :key="ep.id"
+            class="cp-evo-name" :class="{ active: ep.id === p.id }">
+            {{ ep.zhName }}
+          </span>
+        </template>
+      </div>
+
       <div v-if="filtered.length > pageSize * page" style="text-align:center;margin:16px 0">
         <button class="btn btn-sm" @click="page++">
           再載入更多（剩 {{ filtered.length - pageSize * page }} 隻）
@@ -102,6 +113,7 @@ const loading = ref(true)
 const allPokemon = ref([])
 
 const goStats = inject('goStats')
+const getEvoChain = inject('getEvoChain')
 
 const allTypes = [
   'normal','fire','water','electric','grass','ice','fighting','poison',
@@ -194,12 +206,13 @@ loadPokemon()
 <style scoped>
 .cp-card {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 12px 14px;
+  padding: 12px 14px 10px;
   margin-bottom: 10px;
 }
 
@@ -261,4 +274,21 @@ loadPokemon()
   background: var(--border);
   margin: 2px 0;
 }
+
+/* ─── 進化時序 ─── */
+.cp-evo {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding-top: 8px;
+  font-size: 11px;
+  color: var(--sub);
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+.cp-evo-arrow { color: var(--sub); font-size: 10px; }
+.cp-evo-name { color: var(--sub); }
+.cp-evo-name.active { color: var(--accent); font-weight: 700; }
 </style>

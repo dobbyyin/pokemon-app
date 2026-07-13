@@ -18,13 +18,15 @@
 import { ref, provide } from 'vue'
 import PokemonInfo from './views/PokemonInfo.vue'
 import StatsTable from './views/StatsTable.vue'
+import RaidTeam from './views/RaidTeam.vue'
 
 const activeTab = ref(0)
 const tabs = [
   { label: '寶可夢', icon: '⚡' },
   { label: '數值表', icon: '📊' },
+  { label: '團戰', icon: '⚔️' },
 ]
-const views = [PokemonInfo, StatsTable]
+const views = [PokemonInfo, StatsTable, RaidTeam]
 
 // ── 主系列快取 ──
 const pokemonNameMap = ref({})
@@ -58,7 +60,7 @@ const POGO = 'https://pogoapi.net/api/v1'
 
 // ── 主系列快取 ──
 async function loadPokemonCache() {
-  const KEY = 'poke_names_v2', TTL = 86400000
+  const KEY = 'poke_names_v3', TTL = 86400000
   const cached = localStorage.getItem(KEY)
   if (cached) {
     try {
@@ -80,6 +82,8 @@ async function loadPokemonCache() {
           id name
           pokemon_v2_pokemontypes(order_by: {slot: asc}) { pokemon_v2_type { name } }
           pokemon_v2_pokemonspecy {
+            evolves_from_species_id
+            evolution_chain_id
             pokemon_v2_pokemonspeciesnames(where: {pokemon_v2_language: {name: {_eq: "zh-Hant"}}}) { name }
           }
         }
@@ -91,12 +95,34 @@ async function loadPokemonCache() {
       apiName: p.name,
       zhName: p.pokemon_v2_pokemonspecy?.pokemon_v2_pokemonspeciesnames?.[0]?.name || p.name,
       types: p.pokemon_v2_pokemontypes.map(t => t.pokemon_v2_type.name),
+      evolvesFromId: p.pokemon_v2_pokemonspecy?.evolves_from_species_id ?? null,
+      evolutionChainId: p.pokemon_v2_pokemonspecy?.evolution_chain_id ?? null,
     }))
     localStorage.setItem(KEY, JSON.stringify({ ts: Date.now(), data: allPokemonList.value }))
     buildNameMap()
     pokemonCacheReady.value = true
   } catch (e) { console.error(e) }
 }
+
+// ── 進化鏈 ──
+function getEvoChain(targetId) {
+  const target = allPokemonList.value.find(p => p.id === targetId)
+  if (!target || !target.evolutionChainId) return null
+  const chainMembers = allPokemonList.value.filter(p => p.evolutionChainId === target.evolutionChainId)
+  if (chainMembers.length <= 1) return null
+
+  const stages = []
+  let current = chainMembers.filter(p => !p.evolvesFromId)
+  const visited = new Set()
+  while (current.length > 0) {
+    stages.push(current)
+    current.forEach(p => visited.add(p.id))
+    const parentIds = new Set(current.map(p => p.id))
+    current = chainMembers.filter(p => !visited.has(p.id) && parentIds.has(p.evolvesFromId))
+  }
+  return stages.length > 1 ? stages : null
+}
+provide('getEvoChain', getEvoChain)
 
 function buildNameMap() {
   const map = {}

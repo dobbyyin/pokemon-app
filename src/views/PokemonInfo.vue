@@ -237,6 +237,25 @@
           </div>
         </div>
 
+        <!-- 進化時序 -->
+        <template v-if="evoChain">
+          <div class="section-title">🔄 進化時序</div>
+          <div class="evo-chain">
+            <template v-for="(stage, si) in evoChain" :key="si">
+              <span v-if="si > 0" class="evo-arrow">→</span>
+              <div class="evo-stage">
+                <div v-for="ep in stage" :key="ep.id"
+                  class="evo-poke" :class="{ current: ep.id === result.id }"
+                  @click="searchByChainMember(ep)">
+                  <img :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${ep.id}.png`"
+                    width="40" height="40" style="image-rendering:pixelated" />
+                  <div class="evo-name">{{ ep.zhName }}</div>
+                </div>
+              </div>
+            </template>
+          </div>
+        </template>
+
         <!-- PVP -->
         <div class="section-title">🏆 PVP 推薦招式</div>
         <template v-if="goDataReady">
@@ -385,6 +404,7 @@ const goPokemonMoves = inject('goPokemonMoves')
 const goDataReady = inject('goDataReady')
 const moveNameZh = inject('moveNameZh')
 const setAppWide = inject('setAppWide')
+const getEvoChain = inject('getEvoChain')
 watch(compareMode, v => setAppWide(v))
 onUnmounted(() => setAppWide(false))
 
@@ -584,6 +604,14 @@ function toggleCompareFromList(p) {
   compareList.value.push(buildPokemonData(p))
 }
 
+const evoChain = computed(() => result.value ? getEvoChain(result.value.id) : null)
+
+function searchByChainMember(p) {
+  result.value = buildPokemonData(p)
+  query.value = p.zhName
+  error.value = ''
+}
+
 function eliteMoveNamesForPoke(id) {
   const m = goPokemonMoves.value[id]
   if (!m) return ''
@@ -699,6 +727,52 @@ function eliteMoveNamesForPoke(id) {
 .fast-tag { background: #2980ef; color: #fff; }
 .charged-tag { background: #e62829; color: #fff; }
 .move-row-name { font-size: 10px; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ─── Evolution chain ─── */
+.evo-chain {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 12px;
+}
+.evo-arrow {
+  font-size: 18px;
+  color: var(--sub);
+  align-self: center;
+  flex-shrink: 0;
+}
+.evo-stage { display: flex; gap: 4px; flex-wrap: wrap; }
+.evo-poke {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 8px;
+  transition: background .15s;
+  min-width: 52px;
+}
+.evo-poke:hover { background: var(--card2); }
+.evo-poke.current {
+  background: rgba(124,107,255,.18);
+  outline: 2px solid var(--accent);
+}
+.evo-name {
+  font-size: 10px;
+  text-align: center;
+  color: var(--sub);
+  margin-top: 2px;
+  max-width: 56px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.evo-poke.current .evo-name { color: var(--accent); font-weight: 700; }
 
 /* ─── Filter chips (寶可夢頁) ─── */
 .poke-filters {
