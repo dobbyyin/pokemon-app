@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div id="app" :class="{ wide: appWide }">
     <component :is="views[activeTab]" />
     <nav class="bottom-nav">
       <button
@@ -30,6 +30,10 @@ const views = [PokemonInfo, StatsTable]
 const pokemonNameMap = ref({})
 const allPokemonList = ref([])
 const pokemonCacheReady = ref(false)
+
+// ── 比較模式寬版 ──
+const appWide = ref(false)
+provide('setAppWide', (v) => { appWide.value = v })
 
 // ── GO 資料 ──
 const goStats = ref({})        // id → {atk, def, sta}

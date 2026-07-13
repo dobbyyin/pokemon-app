@@ -137,6 +137,14 @@
       </div>
       <button class="btn" style="width:100%;margin-bottom:12px" @click="search">查詢</button>
 
+      <!-- Filter chips -->
+      <div class="poke-filters">
+        <button :class="['poke-filter-chip', filterMode==='' && 'active']" @click="filterMode=''">全部</button>
+        <button :class="['poke-filter-chip', filterMode==='elite' && 'active']" @click="filterMode = filterMode==='elite' ? '' : 'elite'">
+          ⭐ 有特招<template v-if="goDataReady"> ({{ eliteList.length }})</template>
+        </button>
+      </div>
+
       <!-- 比較列 -->
       <div v-if="compareList.length > 0" class="compare-bar">
         <div class="compare-bar-slots">
@@ -155,6 +163,45 @@
           比較 →
         </button>
       </div>
+
+      <!-- ⭐ 特招篩選列表 -->
+      <template v-if="filterMode === 'elite'">
+        <div v-if="!goDataReady" class="center-msg">
+          <div class="spinner"></div><div>GO 資料載入中…</div>
+        </div>
+        <template v-else>
+          <div style="font-size:12px;color:var(--sub);margin-bottom:10px">
+            共 {{ eliteList.length }} 隻・點擊查看詳情，勾選加入比較（最多 3 隻）
+          </div>
+          <div v-for="p in eliteList" :key="p.id" class="flist-item">
+            <button
+              class="flist-check" :class="{ selected: isInCompare(p.id) }"
+              :disabled="!isInCompare(p.id) && compareList.length >= 3"
+              @click.stop="toggleCompareFromList(p)">
+              {{ isInCompare(p.id) ? '☑' : '☐' }}
+            </button>
+            <img
+              :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`"
+              width="40" height="40" style="image-rendering:pixelated;cursor:pointer;flex-shrink:0"
+              @click="searchFromList(p)"
+              @error="e => e.target.style.display='none'" />
+            <div style="flex:1;cursor:pointer;min-width:0" @click="searchFromList(p)">
+              <div style="font-weight:700;font-size:14px">{{ p.zhName }}</div>
+              <div style="display:flex;gap:3px;margin:2px 0;flex-wrap:wrap">
+                <span v-for="t in p.types" :key="t" class="type-badge"
+                  :style="{ background: typeColors[t], fontSize:'10px', padding:'1px 5px' }">{{ typeNameZh[t] }}</span>
+              </div>
+              <div style="font-size:11px;color:#f0c040">⭐ {{ eliteMoveNamesForPoke(p.id) }}</div>
+            </div>
+            <div style="font-size:14px;font-weight:800;color:var(--accent);white-space:nowrap;flex-shrink:0">
+              {{ calcCP(p.id) ?? '—' }}
+            </div>
+          </div>
+        </template>
+      </template>
+
+      <!-- 一般搜尋結果 -->
+      <template v-else>
 
       <!-- 載入中 -->
       <div v-if="searching" class="center-msg">
@@ -308,12 +355,14 @@
         <div style="font-size:40px;margin-bottom:12px">⚡</div>
         <div>輸入寶可夢名稱查詢詳細資料</div>
       </div>
+
+      </template><!-- /一般搜尋結果 -->
     </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, inject } from 'vue'
+import { ref, computed, inject, watch, onUnmounted } from 'vue'
 import { typeNameZh, typeColors, typeAdvantages, typeWeaknesses } from '../utils/typeData.js'
 
 const query = ref('')
@@ -324,6 +373,7 @@ const showAC = ref(false)
 const acIndex = ref(-1)
 const compareList = ref([])
 const compareMode = ref(false)
+const filterMode = ref('')  // '' | 'elite'
 
 const pokemonNameMap = inject('pokemonNameMap')
 const allPokemonList = inject('allPokemonList')
@@ -334,6 +384,9 @@ const goChargedMoves = inject('goChargedMoves')
 const goPokemonMoves = inject('goPokemonMoves')
 const goDataReady = inject('goDataReady')
 const moveNameZh = inject('moveNameZh')
+const setAppWide = inject('setAppWide')
+watch(compareMode, v => setAppWide(v))
+onUnmounted(() => setAppWide(false))
 
 function zhMove(goName) {
   if (!goName) return ''
@@ -502,6 +555,40 @@ function getWeakDefense(types) {
   types.forEach(t => (typeWeaknesses[t] || []).forEach(w => set.add(w)))
   return [...set]
 }
+
+// ── Filter: 有特招 ──
+const eliteList = computed(() => {
+  if (!goDataReady.value || !allPokemonList.value.length) return []
+  return allPokemonList.value.filter(p => {
+    const m = goPokemonMoves.value[p.id]
+    return m && (m.eliteFast.length > 0 || m.eliteCharged.length > 0)
+  }).sort((a, b) => a.id - b.id)
+})
+
+function buildPokemonData(p) {
+  const cp = calcCP(p.id)
+  const moves = goDataReady.value ? getBestMoves(p.id, p.types) : {}
+  return { id: p.id, zhName: p.zhName, types: p.types, cp, ...moves }
+}
+
+function searchFromList(p) {
+  result.value = buildPokemonData(p)
+  error.value = ''
+  searching.value = false
+  filterMode.value = ''
+}
+
+function toggleCompareFromList(p) {
+  if (isInCompare(p.id)) { removeFromCompare(p.id); return }
+  if (compareList.value.length >= 3) return
+  compareList.value.push(buildPokemonData(p))
+}
+
+function eliteMoveNamesForPoke(id) {
+  const m = goPokemonMoves.value[id]
+  if (!m) return ''
+  return [...m.eliteFast, ...m.eliteCharged].map(n => zhMove(n)).filter(Boolean).join('、')
+}
 </script>
 
 <style scoped>
@@ -612,6 +699,63 @@ function getWeakDefense(types) {
 .fast-tag { background: #2980ef; color: #fff; }
 .charged-tag { background: #e62829; color: #fff; }
 .move-row-name { font-size: 10px; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ─── Filter chips (寶可夢頁) ─── */
+.poke-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.poke-filter-chip {
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--sub);
+  cursor: pointer;
+  transition: all .15s;
+}
+.poke-filter-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+/* ─── Filter list items ─── */
+.flist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+}
+.flist-check {
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--sub);
+  font-size: 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  transition: all .15s;
+}
+.flist-check.selected {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.flist-check:disabled { opacity: .4; cursor: not-allowed; }
 
 /* ─── Move cards (search mode) ─── */
 .move-card { background: var(--card2, #1e1e38); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
