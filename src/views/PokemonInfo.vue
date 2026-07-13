@@ -53,6 +53,23 @@
               <div style="flex:1"><div class="move-name">{{ zhMove(p.pveCharged.name) }}</div><div class="move-info">威力 {{ p.pveCharged.power }} ／ 消耗 {{ Math.abs(p.pveCharged.energy_delta) }} 能量</div></div>
             </div>
 
+            <!-- 特招 -->
+            <template v-if="p.eliteFast?.length || p.eliteCharged?.length">
+              <div class="section-title">⭐ 特招（Elite TM）</div>
+              <div v-for="m in p.eliteFast" :key="m.name" class="move-card elite-card">
+                <span class="move-tag fast-tag" style="font-size:11px;padding:3px 8px;background:#b07a20">快速技</span>
+                <span class="type-badge" :style="{background: typeColors[m.type?.toLowerCase()]}">{{ typeNameZh[m.type?.toLowerCase()] }}</span>
+                <div style="flex:1"><div class="move-name">{{ zhMove(m.name) }}</div></div>
+                <span class="elite-badge">限定</span>
+              </div>
+              <div v-for="m in p.eliteCharged" :key="m.name" class="move-card elite-card">
+                <span class="move-tag charged-tag" style="font-size:11px;padding:3px 8px;background:#b07a20">技能技</span>
+                <span class="type-badge" :style="{background: typeColors[m.type?.toLowerCase()]}">{{ typeNameZh[m.type?.toLowerCase()] }}</span>
+                <div style="flex:1"><div class="move-name">{{ zhMove(m.name) }}</div></div>
+                <span class="elite-badge">限定</span>
+              </div>
+            </template>
+
             <!-- 剋制 -->
             <div class="section-title">✅ 剋制屬性</div>
             <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">
@@ -221,6 +238,29 @@
           </div>
         </template>
 
+        <!-- 特招 -->
+        <template v-if="goDataReady && (result.eliteFast?.length || result.eliteCharged?.length)">
+          <div class="section-title">⭐ 特招（Elite TM）</div>
+          <div v-for="m in result.eliteFast" :key="m.name" class="move-card elite-card">
+            <span class="move-tag fast-tag" style="font-size:11px;padding:3px 8px;background:#b07a20">快速技</span>
+            <span class="type-badge" :style="{background: typeColors[m.type?.toLowerCase()]}">{{ typeNameZh[m.type?.toLowerCase()] }}</span>
+            <div style="flex:1">
+              <div class="move-name">{{ zhMove(m.name) }}</div>
+              <div class="move-info">威力 {{ m.power }} ／ 能量 +{{ m.energy_delta }}</div>
+            </div>
+            <span class="elite-badge">限定</span>
+          </div>
+          <div v-for="m in result.eliteCharged" :key="m.name" class="move-card elite-card">
+            <span class="move-tag charged-tag" style="font-size:11px;padding:3px 8px;background:#b07a20">技能技</span>
+            <span class="type-badge" :style="{background: typeColors[m.type?.toLowerCase()]}">{{ typeNameZh[m.type?.toLowerCase()] }}</span>
+            <div style="flex:1">
+              <div class="move-name">{{ zhMove(m.name) }}</div>
+              <div class="move-info">威力 {{ m.power }} ／ 消耗 {{ Math.abs(m.energy_delta) }} 能量</div>
+            </div>
+            <span class="elite-badge">限定</span>
+          </div>
+        </template>
+
         <!-- 剋制 -->
         <div class="section-title">✅ 適合攻擊的寶可夢</div>
         <div style="margin-bottom:8px;font-size:12px;color:var(--sub)">
@@ -349,11 +389,16 @@ function getBestMoves(pokemonId, types) {
     return (m.power || 0) * ((m.power || 0) / cost) * (stab.includes(m.type) ? 1.2 : 1)
   }
 
+  const eliteFastObjs = moveEntry.eliteFast.map(n => goFastMoves.value[n]).filter(Boolean)
+  const eliteChargedObjs = moveEntry.eliteCharged.map(n => goChargedMoves.value[n]).filter(Boolean)
+
   return {
     pvpFast: [...allFast].sort((a, b) => pvpFastScore(b) - pvpFastScore(a))[0] || null,
     pvpCharged: [...allCharged].sort((a, b) => pvpChargedScore(b) - pvpChargedScore(a))[0] || null,
     pveFast: [...allFast].sort((a, b) => pveFastScore(b) - pveFastScore(a))[0] || null,
     pveCharged: [...allCharged].sort((a, b) => pveChargedScore(b) - pveChargedScore(a))[0] || null,
+    eliteFast: eliteFastObjs,
+    eliteCharged: eliteChargedObjs,
   }
 }
 
@@ -572,4 +617,6 @@ function getWeakDefense(types) {
 .move-card { background: var(--card2, #1e1e38); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
 .move-name { font-weight: 600; font-size: 14px; }
 .move-info { font-size: 12px; color: var(--sub); }
+.elite-card { border-color: #c0902a; background: #1e1a0e; }
+.elite-badge { font-size: 11px; color: #f0c040; font-weight: 700; flex-shrink: 0; }
 </style>
