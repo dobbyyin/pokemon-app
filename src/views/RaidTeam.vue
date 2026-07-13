@@ -79,6 +79,31 @@
         </div>
       </div>
 
+      <!-- 進化時序 -->
+      <template v-if="bossEvoChain">
+        <div class="section-title">🔄 進化時序</div>
+        <div class="boss-evo-chain">
+          <template v-for="(stage, si) in bossEvoChain" :key="si">
+            <span v-if="si > 0" class="evo-arrow">→</span>
+            <div class="evo-stage">
+              <div v-for="ep in stage" :key="ep.id"
+                class="boss-evo-poke"
+                :class="{
+                  current: ep.id === boss.id,
+                  clickable: raidMode !== 'gmax' || allGmaxIds.includes(ep.id),
+                  gmax: allGmaxIds.includes(ep.id)
+                }"
+                @click="selectChainMember(ep)">
+                <img :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${ep.id}.png`"
+                  width="40" height="40" style="image-rendering:pixelated" />
+                <div class="boss-evo-name">{{ ep.zhName }}</div>
+                <div v-if="allGmaxIds.includes(ep.id)" class="gmax-dot">⚡</div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </template>
+
       <!-- 推薦隊伍 -->
       <div v-if="!goDataReady" class="center-msg">
         <div class="spinner"></div><div>GO 資料載入中…</div>
@@ -171,6 +196,8 @@
 import { ref, computed, inject } from 'vue'
 import { typeNameZh, typeColors, typeWeaknesses } from '../utils/typeData.js'
 
+const getEvoChain = inject('getEvoChain')
+
 const query = ref('')
 const searching = ref(false)
 const error = ref('')
@@ -225,8 +252,7 @@ function searchBoss() {
   searching.value = false
 }
 
-// ── 極巨化 Boss 清單 ──
-// 以世代分組，IDs 為 national dex（is_default form）
+// ── 極巨化 Boss 清單（主系列劍盾 + GO Max Battle 確認出現） ──
 const GMAX_GROUPS = [
   {
     label: '第一世代',
@@ -245,6 +271,16 @@ const GMAX_GROUPS = [
     ids: [812, 815, 818, 823, 826, 834, 839, 841, 842, 844, 849, 851, 858, 861, 869, 879, 884, 892],
   },
 ]
+
+// 進化鏈
+const bossEvoChain = computed(() => boss.value ? getEvoChain(boss.value.id) : null)
+
+function selectChainMember(p) {
+  // 若該進化也有極巨化 → 切換 Boss
+  if (raidMode.value === 'gmax' && !allGmaxIds.includes(p.id)) return
+  boss.value = p
+  if (raidMode.value === 'gmax') gmaxSelected.value = p.id
+}
 
 const gmaxGroups = computed(() =>
   GMAX_GROUPS.map(g => ({
@@ -350,6 +386,49 @@ const counters = computed(() => {
 </script>
 
 <style scoped>
+/* ── 進化時序（團戰頁）── */
+.boss-evo-chain {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  margin-bottom: 16px;
+}
+.evo-arrow { font-size: 18px; color: var(--sub); align-self: center; flex-shrink: 0; }
+.evo-stage { display: flex; gap: 4px; flex-wrap: wrap; }
+.boss-evo-poke {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 8px;
+  position: relative;
+  opacity: .45;
+  transition: all .15s;
+  min-width: 52px;
+}
+.boss-evo-poke.gmax { opacity: 1; }
+.boss-evo-poke.clickable { cursor: pointer; }
+.boss-evo-poke.clickable:hover { background: var(--card2); }
+.boss-evo-poke.current {
+  background: rgba(124,107,255,.18);
+  outline: 2px solid var(--accent);
+}
+.boss-evo-name {
+  font-size: 10px; text-align: center; color: var(--sub);
+  margin-top: 2px; max-width: 56px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.boss-evo-poke.current .boss-evo-name { color: var(--accent); font-weight: 700; }
+.gmax-dot {
+  position: absolute; top: 0; right: 2px;
+  font-size: 9px; line-height: 1;
+}
+
 /* ── 模式切換 ── */
 .mode-tabs {
   display: flex;
