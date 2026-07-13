@@ -16,18 +16,16 @@
 </template>
 
 <script setup>
-import { ref, provide, shallowRef } from 'vue'
-import ItemSearch from './views/ItemSearch.vue'
+import { ref, provide } from 'vue'
 import PokemonInfo from './views/PokemonInfo.vue'
 import StatsTable from './views/StatsTable.vue'
 
 const activeTab = ref(0)
 const tabs = [
-  { label: '道具', icon: '🎒' },
   { label: '寶可夢', icon: '⚡' },
   { label: '數值表', icon: '📊' },
 ]
-const views = [ItemSearch, PokemonInfo, StatsTable]
+const views = [PokemonInfo, StatsTable]
 
 // Global Pokemon name cache: { zhName -> apiName, apiName -> zhName }
 const pokemonNameMap = ref({})
