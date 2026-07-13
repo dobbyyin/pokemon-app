@@ -37,6 +37,7 @@ const goFastMoves = ref({})    // name → {power, energyDelta, duration}
 const goChargedMoves = ref({}) // name → {power, energyDelta}
 const goPokemonMoves = ref({}) // id → {fast:[], charged:[], eliteFast:[], eliteCharged:[]}
 const goDataReady = ref(false)
+const moveNameZh = ref({})     // normalized-en-name → 中文招式名
 
 provide('pokemonNameMap', pokemonNameMap)
 provide('allPokemonList', allPokemonList)
@@ -46,6 +47,7 @@ provide('goFastMoves', goFastMoves)
 provide('goChargedMoves', goChargedMoves)
 provide('goPokemonMoves', goPokemonMoves)
 provide('goDataReady', goDataReady)
+provide('moveNameZh', moveNameZh)
 
 const GQL = 'https://beta.pokeapi.co/graphql/v1beta'
 const POGO = 'https://pogoapi.net/api/v1'
@@ -161,6 +163,42 @@ async function loadGOData() {
   } catch (e) { console.error('GO data load failed', e) }
 }
 
+// ── 招式中文名對照表 ──
+async function loadMoveNames() {
+  const KEY = 'poke_moves_zh_v1', TTL = 86400000 * 7
+  const cached = localStorage.getItem(KEY)
+  if (cached) {
+    try {
+      const { ts, data } = JSON.parse(cached)
+      if (Date.now() - ts < TTL) { moveNameZh.value = data; return }
+    } catch {}
+  }
+  try {
+    const res = await fetch(GQL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: `{
+        pokemon_v2_move {
+          name
+          pokemon_v2_movenames(where: {pokemon_v2_language: {name: {_eq: "zh-Hant"}}}) { name }
+        }
+      }` })
+    })
+    const json = await res.json()
+    const map = {}
+    for (const m of json.data.pokemon_v2_move) {
+      const zh = m.pokemon_v2_movenames[0]?.name
+      if (zh) {
+        map[m.name] = zh                          // e.g. "psycho-cut" → "神秘劍"
+        map[m.name.replace(/-/g, '')] = zh        // e.g. "psychocut" → "神秘劍"
+      }
+    }
+    moveNameZh.value = map
+    localStorage.setItem(KEY, JSON.stringify({ ts: Date.now(), data: map }))
+  } catch (e) { console.error('move names load failed', e) }
+}
+
 loadPokemonCache()
 loadGOData()
+loadMoveNames()
 </script>

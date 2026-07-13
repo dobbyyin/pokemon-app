@@ -1,73 +1,101 @@
 <template>
   <div class="page">
-    <!-- ─── 比較模式 ─── -->
+    <!-- ─── 比較模式（滿版橫向捲動三欄） ─── -->
     <template v-if="compareMode">
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
         <button class="btn btn-sm" style="background:var(--card);color:var(--text);border:1px solid var(--border)" @click="compareMode = false">← 返回</button>
         <span style="font-size:16px;font-weight:700">比較</span>
       </div>
 
-      <div class="compare-grid">
-        <div v-for="(p, ci) in paddedCompare" :key="ci" class="compare-col">
+      <!-- 三欄橫向捲動，每欄滿版內容 -->
+      <div class="cmp-scroll">
+        <div v-for="(p, ci) in paddedCompare" :key="ci" class="cmp-col">
           <template v-if="p">
-            <div class="col-header">
-              <img :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`"
-                width="52" height="52" style="image-rendering:pixelated"
+            <!-- Header -->
+            <div class="card" style="text-align:center;margin-bottom:10px">
+              <img :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${p.id}.png`"
+                style="width:90px;height:90px;object-fit:contain"
                 @error="e => e.target.style.display='none'" />
-              <div>
-                <div class="col-name">{{ p.zhName }}</div>
-                <div style="font-size:10px;color:var(--sub)">#{{ String(p.id).padStart(4,'0') }}</div>
-                <div style="display:flex;gap:3px;flex-wrap:wrap;margin-top:3px">
-                  <span v-for="t in p.types" :key="t" class="type-badge"
-                    :style="{ background: typeColors[t], fontSize:'10px', padding:'2px 6px' }">{{ typeNameZh[t] }}</span>
+              <div style="font-size:18px;font-weight:800;margin:6px 0 2px">{{ p.zhName }}</div>
+              <div style="color:var(--sub);font-size:12px;margin-bottom:8px">#{{ String(p.id).padStart(4,'0') }}</div>
+              <div style="display:flex;gap:6px;justify-content:center;margin-bottom:10px">
+                <span v-for="t in p.types" :key="t" class="type-badge" :style="{ background: typeColors[t] }">{{ typeNameZh[t] }}</span>
+              </div>
+              <div style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border-radius:10px;padding:7px 14px">
+                <span style="font-size:11px;color:var(--sub)">紅三星 CP</span>
+                <span style="font-size:20px;font-weight:800;color:var(--accent)">{{ p.cp ?? '—' }}</span>
+              </div>
+            </div>
+
+            <!-- PVP -->
+            <div class="section-title">🏆 PVP 推薦招式</div>
+            <div v-if="p.pvpFast" class="move-card">
+              <span class="move-tag fast-tag" style="font-size:11px;padding:3px 8px">快速技</span>
+              <span class="type-badge" :style="{background: typeColors[p.pvpFast.type?.toLowerCase()]}">{{ typeNameZh[p.pvpFast.type?.toLowerCase()] }}</span>
+              <div style="flex:1"><div class="move-name">{{ zhMove(p.pvpFast.name) }}</div><div class="move-info">威力 {{ p.pvpFast.power }} ／ 能量 +{{ p.pvpFast.energy_delta }}</div></div>
+            </div>
+            <div v-if="p.pvpCharged" class="move-card">
+              <span class="move-tag charged-tag" style="font-size:11px;padding:3px 8px">技能技</span>
+              <span class="type-badge" :style="{background: typeColors[p.pvpCharged.type?.toLowerCase()]}">{{ typeNameZh[p.pvpCharged.type?.toLowerCase()] }}</span>
+              <div style="flex:1"><div class="move-name">{{ zhMove(p.pvpCharged.name) }}</div><div class="move-info">威力 {{ p.pvpCharged.power }} ／ 消耗 {{ Math.abs(p.pvpCharged.energy_delta) }} 能量</div></div>
+            </div>
+
+            <!-- PVE -->
+            <div class="section-title">⚔️ PVE 推薦招式</div>
+            <div v-if="p.pveFast" class="move-card">
+              <span class="move-tag fast-tag" style="font-size:11px;padding:3px 8px">快速技</span>
+              <span class="type-badge" :style="{background: typeColors[p.pveFast.type?.toLowerCase()]}">{{ typeNameZh[p.pveFast.type?.toLowerCase()] }}</span>
+              <div style="flex:1"><div class="move-name">{{ zhMove(p.pveFast.name) }}</div><div class="move-info">威力 {{ p.pveFast.power }}</div></div>
+            </div>
+            <div v-if="p.pveCharged" class="move-card">
+              <span class="move-tag charged-tag" style="font-size:11px;padding:3px 8px">技能技</span>
+              <span class="type-badge" :style="{background: typeColors[p.pveCharged.type?.toLowerCase()]}">{{ typeNameZh[p.pveCharged.type?.toLowerCase()] }}</span>
+              <div style="flex:1"><div class="move-name">{{ zhMove(p.pveCharged.name) }}</div><div class="move-info">威力 {{ p.pveCharged.power }} ／ 消耗 {{ Math.abs(p.pveCharged.energy_delta) }} 能量</div></div>
+            </div>
+
+            <!-- 剋制 -->
+            <div class="section-title">✅ 剋制屬性</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">
+              <span v-for="t in getWeakToAttack(p.types)" :key="t" class="type-badge" :style="{ background: typeColors[t] }">{{ typeNameZh[t] }}</span>
+              <span v-if="!getWeakToAttack(p.types).length" style="font-size:12px;color:var(--sub)">無</span>
+            </div>
+
+            <!-- 弱點 -->
+            <div class="section-title">⚠️ 弱點屬性</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">
+              <span v-for="t in getWeakDefense(p.types)" :key="t" class="type-badge" :style="{ background: typeColors[t] }">{{ typeNameZh[t] }}</span>
+            </div>
+
+            <!-- 適合攻擊 -->
+            <div class="section-title">✅ 適合攻擊</div>
+            <div class="poke-mini-list" style="margin-bottom:12px">
+              <div v-for="pk in allPokemonList.filter(pk => pk.types.some(t => getWeakToAttack(p.types).includes(t))).slice(0,8)" :key="pk.id" class="poke-mini">
+                <img :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pk.id}.png`" width="28" height="28" style="image-rendering:pixelated" />
+                <div>
+                  <div style="font-weight:600;font-size:12px">{{ pk.zhName }}</div>
+                  <div style="display:flex;gap:3px;margin-top:1px">
+                    <span v-for="t in pk.types" :key="t" class="type-badge" :style="{ background: typeColors[t], fontSize:'9px' }">{{ typeNameZh[t] }}</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div class="col-cp">
-              <span class="col-cp-label">紅三星 CP</span>
-              <span class="col-cp-val">{{ p.cp ?? '—' }}</span>
-            </div>
-
-            <div class="col-section-title">🏆 PVP</div>
-            <div class="move-row" v-if="p.pvpFast">
-              <span class="move-tag fast-tag">快</span>
-              <span class="type-badge" :style="{background: typeColors[p.pvpFast.type?.toLowerCase()], fontSize:'9px', padding:'1px 4px'}">{{ typeNameZh[p.pvpFast.type?.toLowerCase()] }}</span>
-              <span class="move-row-name">{{ p.pvpFast.name }}</span>
-            </div>
-            <div class="move-row" v-if="p.pvpCharged">
-              <span class="move-tag charged-tag">技</span>
-              <span class="type-badge" :style="{background: typeColors[p.pvpCharged.type?.toLowerCase()], fontSize:'9px', padding:'1px 4px'}">{{ typeNameZh[p.pvpCharged.type?.toLowerCase()] }}</span>
-              <span class="move-row-name">{{ p.pvpCharged.name }}</span>
-            </div>
-
-            <div class="col-section-title">⚔️ PVE</div>
-            <div class="move-row" v-if="p.pveFast">
-              <span class="move-tag fast-tag">快</span>
-              <span class="type-badge" :style="{background: typeColors[p.pveFast.type?.toLowerCase()], fontSize:'9px', padding:'1px 4px'}">{{ typeNameZh[p.pveFast.type?.toLowerCase()] }}</span>
-              <span class="move-row-name">{{ p.pveFast.name }}</span>
-            </div>
-            <div class="move-row" v-if="p.pveCharged">
-              <span class="move-tag charged-tag">技</span>
-              <span class="type-badge" :style="{background: typeColors[p.pveCharged.type?.toLowerCase()], fontSize:'9px', padding:'1px 4px'}">{{ typeNameZh[p.pveCharged.type?.toLowerCase()] }}</span>
-              <span class="move-row-name">{{ p.pveCharged.name }}</span>
-            </div>
-
-            <div class="col-section-title">✅ 剋制</div>
-            <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:6px">
-              <span v-for="t in getWeakToAttack(p.types)" :key="t" class="type-badge"
-                :style="{ background: typeColors[t], fontSize:'10px', padding:'2px 5px' }">{{ typeNameZh[t] }}</span>
-              <span v-if="!getWeakToAttack(p.types).length" style="font-size:11px;color:var(--sub)">無</span>
-            </div>
-
-            <div class="col-section-title">⚠️ 弱點</div>
-            <div style="display:flex;flex-wrap:wrap;gap:3px">
-              <span v-for="t in getWeakDefense(p.types)" :key="t" class="type-badge"
-                :style="{ background: typeColors[t], fontSize:'10px', padding:'2px 5px' }">{{ typeNameZh[t] }}</span>
+            <!-- 最怕 -->
+            <div class="section-title">⚠️ 最怕</div>
+            <div class="poke-mini-list" style="margin-bottom:16px">
+              <div v-for="pk in allPokemonList.filter(pk => pk.types.some(t => getWeakDefense(p.types).includes(t))).slice(0,8)" :key="pk.id" class="poke-mini">
+                <img :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${pk.id}.png`" width="28" height="28" style="image-rendering:pixelated" />
+                <div>
+                  <div style="font-weight:600;font-size:12px">{{ pk.zhName }}</div>
+                  <div style="display:flex;gap:3px;margin-top:1px">
+                    <span v-for="t in pk.types" :key="t" class="type-badge" :style="{ background: typeColors[t], fontSize:'9px' }">{{ typeNameZh[t] }}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </template>
 
-          <div v-else class="col-empty">—</div>
+          <div v-else class="cmp-empty">—</div>
         </div>
       </div>
     </template>
@@ -153,7 +181,7 @@
               <span class="move-tag fast-tag" style="font-size:11px;padding:3px 8px">快速技</span>
               <span class="type-badge" :style="{background: typeColors[result.pvpFast.type?.toLowerCase()]}">{{ typeNameZh[result.pvpFast.type?.toLowerCase()] }}</span>
               <div style="flex:1">
-                <div class="move-name">{{ result.pvpFast.name }}</div>
+                <div class="move-name">{{ zhMove(result.pvpFast.name) }}</div>
                 <div class="move-info">威力 {{ result.pvpFast.power }} ／ 能量 +{{ result.pvpFast.energy_delta }} ／ {{ result.pvpFast.duration }}ms</div>
               </div>
             </div>
@@ -161,7 +189,7 @@
               <span class="move-tag charged-tag" style="font-size:11px;padding:3px 8px">技能技</span>
               <span class="type-badge" :style="{background: typeColors[result.pvpCharged.type?.toLowerCase()]}">{{ typeNameZh[result.pvpCharged.type?.toLowerCase()] }}</span>
               <div style="flex:1">
-                <div class="move-name">{{ result.pvpCharged.name }}</div>
+                <div class="move-name">{{ zhMove(result.pvpCharged.name) }}</div>
                 <div class="move-info">威力 {{ result.pvpCharged.power }} ／ 消耗 {{ Math.abs(result.pvpCharged.energy_delta) }} 能量</div>
               </div>
             </div>
@@ -178,7 +206,7 @@
               <span class="move-tag fast-tag" style="font-size:11px;padding:3px 8px">快速技</span>
               <span class="type-badge" :style="{background: typeColors[result.pveFast.type?.toLowerCase()]}">{{ typeNameZh[result.pveFast.type?.toLowerCase()] }}</span>
               <div style="flex:1">
-                <div class="move-name">{{ result.pveFast.name }}</div>
+                <div class="move-name">{{ zhMove(result.pveFast.name) }}</div>
                 <div class="move-info">威力 {{ result.pveFast.power }} ／ {{ result.pveFast.duration }}ms</div>
               </div>
             </div>
@@ -186,7 +214,7 @@
               <span class="move-tag charged-tag" style="font-size:11px;padding:3px 8px">技能技</span>
               <span class="type-badge" :style="{background: typeColors[result.pveCharged.type?.toLowerCase()]}">{{ typeNameZh[result.pveCharged.type?.toLowerCase()] }}</span>
               <div style="flex:1">
-                <div class="move-name">{{ result.pveCharged.name }}</div>
+                <div class="move-name">{{ zhMove(result.pveCharged.name) }}</div>
                 <div class="move-info">威力 {{ result.pveCharged.power }} ／ 消耗 {{ Math.abs(result.pveCharged.energy_delta) }} 能量</div>
               </div>
             </div>
@@ -265,6 +293,15 @@ const goFastMoves = inject('goFastMoves')
 const goChargedMoves = inject('goChargedMoves')
 const goPokemonMoves = inject('goPokemonMoves')
 const goDataReady = inject('goDataReady')
+const moveNameZh = inject('moveNameZh')
+
+function zhMove(goName) {
+  if (!goName) return ''
+  // "Psycho Cut" → "psycho-cut" → lookup；再試 "psychocut"
+  const key1 = goName.toLowerCase().replace(/ /g, '-')
+  const key2 = goName.toLowerCase().replace(/[\s-]/g, '')
+  return moveNameZh.value[key1] || moveNameZh.value[key2] || goName
+}
 
 const GQL = 'https://beta.pokeapi.co/graphql/v1beta'
 
@@ -495,49 +532,37 @@ function getWeakDefense(types) {
   color: #fff;
 }
 
-/* ─── Compare grid ─── */
-.compare-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
+/* ─── Compare scroll ─── */
+.cmp-scroll {
+  display: flex;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 8px;
+  scroll-snap-type: x mandatory;
 }
-.compare-col {
-  min-width: 0;
+.cmp-scroll::-webkit-scrollbar { height: 4px; }
+.cmp-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.cmp-col {
+  flex: 0 0 calc(100% - 32px); /* 每欄接近全寬 */
+  scroll-snap-align: start;
+  min-width: 280px;
+}
+.cmp-empty {
+  flex: 0 0 calc(100% - 32px);
+  min-width: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px 8px;
-}
-.col-empty {
-  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 14px;
   color: var(--border);
-  font-size: 24px;
-  padding: 40px 0;
+  font-size: 32px;
+  min-height: 200px;
 }
-.col-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 8px;
-}
-.col-name { font-weight: 700; font-size: 12px; line-height: 1.2; }
-.col-cp {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  background: var(--surface);
-  border-radius: 8px;
-  padding: 5px 8px;
-  margin-bottom: 8px;
-}
-.col-cp-label { font-size: 9px; color: var(--sub); }
-.col-cp-val { font-size: 16px; font-weight: 800; color: var(--accent); }
-.col-section-title {
-  font-size: 9px; font-weight: 700; color: var(--sub);
-  letter-spacing: .5px; text-transform: uppercase;
-  margin: 6px 0 4px;
-}
-.move-row { display: flex; align-items: center; gap: 3px; margin-bottom: 4px; }
+
+/* ─── 舊 col-* 保留給 compare-bar 內小圖用 ─── */
 .move-tag { font-size: 9px; font-weight: 700; padding: 2px 4px; border-radius: 4px; flex-shrink: 0; }
 .fast-tag { background: #2980ef; color: #fff; }
 .charged-tag { background: #e62829; color: #fff; }
