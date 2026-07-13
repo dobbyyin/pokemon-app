@@ -4,75 +4,83 @@
 
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
-      <input v-model="query" placeholder="搜尋寶可夢名稱…" />
+      <input v-model="query" placeholder="搜尋寶可夢名稱…" @input="page = 1" />
     </div>
 
     <!-- 屬性 Filter -->
     <div class="chips">
       <button
-        class="chip"
-        :class="{ active: !typeFilter }"
-        :style="{ background: '#444', color: '#fff' }"
-        @click="typeFilter = ''"
+        class="chip" :class="{ active: !typeFilter }"
+        style="background:#555"
+        @click="typeFilter = ''; page = 1"
       >全部</button>
       <button
         v-for="t in allTypes" :key="t"
-        class="chip"
-        :class="{ active: typeFilter === t }"
+        class="chip" :class="{ active: typeFilter === t }"
         :style="{ background: typeColors[t] }"
-        @click="typeFilter = typeFilter === t ? '' : t"
+        @click="typeFilter = typeFilter === t ? '' : t; page = 1"
       >{{ typeNameZh[t] }}</button>
     </div>
 
     <div v-if="loading" class="center-msg">
       <div class="spinner"></div>
-      <div>載入寶可夢資料中… ({{ loadProgress }})</div>
+      <div>載入中…</div>
     </div>
 
     <template v-else>
-      <div style="font-size:12px;color:var(--sub);margin-bottom:10px">
-        共 {{ filtered.length }} 隻 ／ Lv.100（31 IV、0 EV、無性格加成）
+      <div style="font-size:12px;color:var(--sub);margin-bottom:14px">
+        共 {{ filtered.length }} 隻　Lv.100 數值（31 IV・0 EV・無性格加成）
       </div>
 
-      <!-- Header -->
-      <div class="stats-row header">
-        <div class="name-col">名稱</div>
-        <div class="num"><button class="sort-btn" @click="sortBy('hp')">HP{{ sortKey==='hp'?(sortAsc?'▲':'▼'):'' }}</button></div>
-        <div class="num"><button class="sort-btn" @click="sortBy('attack')">攻{{ sortKey==='attack'?(sortAsc?'▲':'▼'):'' }}</button></div>
-        <div class="num"><button class="sort-btn" @click="sortBy('defense')">防{{ sortKey==='defense'?(sortAsc?'▲':'▼'):'' }}</button></div>
-        <div class="num"><button class="sort-btn" @click="sortBy('special-attack')">特攻{{ sortKey==='special-attack'?(sortAsc?'▲':'▼'):'' }}</button></div>
-        <div class="num"><button class="sort-btn" @click="sortBy('special-defense')">特防{{ sortKey==='special-defense'?(sortAsc?'▲':'▼'):'' }}</button></div>
-        <div class="num"><button class="sort-btn" @click="sortBy('speed')">速{{ sortKey==='speed'?(sortAsc?'▲':'▼'):'' }}</button></div>
-        <div class="num"><button class="sort-btn" @click="sortBy('total')">總{{ sortKey==='total'?(sortAsc?'▲':'▼'):'' }}</button></div>
-      </div>
-
-      <div
-        v-for="p in paginated" :key="p.id"
-        class="stats-row"
-      >
-        <div class="name-col">
-          <div style="font-weight:600;font-size:12px">{{ p.zhName }}</div>
-          <div style="display:flex;gap:3px;margin-top:3px">
-            <span
-              v-for="t in p.types" :key="t"
-              class="type-badge"
-              :style="{ background: typeColors[t], fontSize:'9px', padding:'1px 5px' }"
-            >{{ typeNameZh[t] }}</span>
+      <div v-for="p in paginated" :key="p.id" class="poke-stat-card">
+        <!-- 左側：圖 + 名稱 + 屬性 -->
+        <div class="poke-stat-left">
+          <img
+            :src="`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${p.id}.png`"
+            width="56" height="56" style="image-rendering:pixelated"
+            @error="e => e.target.style.display='none'"
+          />
+          <div>
+            <div style="font-weight:700;font-size:15px">{{ p.zhName }}</div>
+            <div style="font-size:11px;color:var(--sub);margin:2px 0">#{{ String(p.id).padStart(4,'0') }}</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap">
+              <span
+                v-for="t in p.types" :key="t"
+                class="type-badge"
+                :style="{ background: typeColors[t], fontSize:'11px' }"
+              >{{ typeNameZh[t] }}</span>
+            </div>
           </div>
         </div>
-        <div class="num" :style="{ color: statColor(p.lv100.hp) }">{{ p.lv100.hp }}</div>
-        <div class="num" :style="{ color: statColor(p.lv100.attack) }">{{ p.lv100.attack }}</div>
-        <div class="num" :style="{ color: statColor(p.lv100.defense) }">{{ p.lv100.defense }}</div>
-        <div class="num" :style="{ color: statColor(p.lv100['special-attack']) }">{{ p.lv100['special-attack'] }}</div>
-        <div class="num" :style="{ color: statColor(p.lv100['special-defense']) }">{{ p.lv100['special-defense'] }}</div>
-        <div class="num" :style="{ color: statColor(p.lv100.speed) }">{{ p.lv100.speed }}</div>
-        <div class="num" style="font-weight:700;color:var(--accent)">{{ p.total }}</div>
+
+        <!-- 右側：六項數值 -->
+        <div class="poke-stat-bars">
+          <div v-for="s in statOrder" :key="s.key" class="stat-row">
+            <span class="stat-label">{{ s.label }}</span>
+            <span class="stat-val" :style="{ color: statColor(p.lv100[s.key]) }">{{ p.lv100[s.key] }}</span>
+            <div class="stat-bar-bg">
+              <div
+                class="stat-bar-fill"
+                :style="{
+                  width: Math.min(100, p.lv100[s.key] / 4.1) + '%',
+                  background: statColor(p.lv100[s.key])
+                }"
+              ></div>
+            </div>
+          </div>
+          <div style="text-align:right;font-size:12px;color:var(--sub);margin-top:4px">
+            總計 <strong style="color:var(--accent)">{{ p.total }}</strong>
+          </div>
+        </div>
       </div>
 
-      <!-- Load more -->
       <div v-if="filtered.length > pageSize * page" style="text-align:center;margin:16px 0">
-        <button class="btn btn-sm" @click="page++">載入更多（{{ filtered.length - pageSize * page }} 隻）</button>
+        <button class="btn btn-sm" @click="page++">
+          再載入更多（剩 {{ filtered.length - pageSize * page }} 隻）
+        </button>
       </div>
+
+      <div v-if="filtered.length === 0" class="center-msg">找不到符合條件的寶可夢</div>
     </template>
   </div>
 </template>
@@ -83,20 +91,24 @@ import { typeNameZh, typeColors, calcLv100Stat, statColor } from '../utils/typeD
 
 const query = ref('')
 const typeFilter = ref('')
-const sortKey = ref('total')
-const sortAsc = ref(false)
 const page = ref(1)
-const pageSize = 60
-
-const pokemonCacheReady = inject('pokemonCacheReady')
+const pageSize = 30
 
 const loading = ref(true)
-const loadProgress = ref('0 / ?')
 const allPokemon = ref([])
 
 const allTypes = [
   'normal','fire','water','electric','grass','ice','fighting','poison',
   'ground','flying','psychic','bug','rock','ghost','dragon','dark','steel','fairy'
+]
+
+const statOrder = [
+  { key: 'hp', label: 'HP' },
+  { key: 'attack', label: '攻擊' },
+  { key: 'defense', label: '防禦' },
+  { key: 'special-attack', label: '特攻' },
+  { key: 'special-defense', label: '特防' },
+  { key: 'speed', label: '速度' },
 ]
 
 const GQL = 'https://beta.pokeapi.co/graphql/v1beta'
@@ -117,7 +129,6 @@ async function loadStats() {
   }
 
   try {
-    loadProgress.value = '查詢中…'
     const res = await fetch(GQL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -142,7 +153,6 @@ async function loadStats() {
     })
     const json = await res.json()
     const raw = json.data?.pokemon_v2_pokemon || []
-    loadProgress.value = `處理 ${raw.length} 筆…`
 
     allPokemon.value = raw.map(p => {
       const stats = {}
@@ -159,7 +169,6 @@ async function loadStats() {
         apiName: p.name,
         zhName: p.pokemon_v2_pokemonspecy?.pokemon_v2_pokemonspeciesnames?.[0]?.name || p.name,
         types: p.pokemon_v2_pokemontypes.map(t => t.pokemon_v2_type.name),
-        stats,
         lv100,
         total,
       }
@@ -172,12 +181,6 @@ async function loadStats() {
   loading.value = false
 }
 
-function sortBy(key) {
-  if (sortKey.value === key) sortAsc.value = !sortAsc.value
-  else { sortKey.value = key; sortAsc.value = false }
-  page.value = 1
-}
-
 const filtered = computed(() => {
   let list = allPokemon.value
   if (query.value.trim()) {
@@ -187,15 +190,70 @@ const filtered = computed(() => {
   if (typeFilter.value) {
     list = list.filter(p => p.types.includes(typeFilter.value))
   }
-  const key = sortKey.value
-  return [...list].sort((a, b) => {
-    const va = key === 'total' ? a.total : (a.lv100[key] || 0)
-    const vb = key === 'total' ? b.total : (b.lv100[key] || 0)
-    return sortAsc.value ? va - vb : vb - va
-  })
+  return list
 })
 
 const paginated = computed(() => filtered.value.slice(0, pageSize * page.value))
 
 loadStats()
 </script>
+
+<style scoped>
+.poke-stat-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.poke-stat-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.poke-stat-bars {
+  width: 100%;
+}
+
+.stat-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+  font-size: 13px;
+}
+
+.stat-label {
+  width: 40px;
+  color: var(--sub);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.stat-val {
+  width: 34px;
+  text-align: right;
+  font-weight: 700;
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.stat-bar-bg {
+  flex: 1;
+  height: 7px;
+  background: var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.stat-bar-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width .4s;
+}
+</style>
